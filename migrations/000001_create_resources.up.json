@@ -1,0 +1,15 @@
+[
+  {
+    "create": "resources"
+  },
+  {
+    "createIndexes": "resources",
+    "indexes": [
+      {
+        "key": { "name": 1 },
+        "name": "idx_resources_name",
+        "unique": true
+      }
+    ]
+  }
+]

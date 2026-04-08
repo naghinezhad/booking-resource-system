@@ -1,0 +1,35 @@
+[
+  {
+    "create": "reservations",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["resource_id", "start_time", "end_time"],
+        "properties": {
+          "resource_id": {
+            "bsonType": "objectId"
+          },
+          "start_time": {
+            "bsonType": "date"
+          },
+          "end_time": {
+            "bsonType": "date"
+          }
+        }
+      }
+    }
+  },
+  {
+    "createIndexes": "reservations",
+    "indexes": [
+      {
+        "key": { "resource_id": 1, "start_time": 1 },
+        "name": "idx_reservations_resource_start"
+      },
+      {
+        "key": { "resource_id": 1, "end_time": 1 },
+        "name": "idx_reservations_resource_end"
+      }
+    ]
+  }
+]
