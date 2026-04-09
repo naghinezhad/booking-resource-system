@@ -6,7 +6,9 @@
     "createIndexes": "resources",
     "indexes": [
       {
-        "key": { "name": 1 },
+        "key": {
+          "name": 1
+        },
         "name": "idx_resources_name",
         "unique": true
       }

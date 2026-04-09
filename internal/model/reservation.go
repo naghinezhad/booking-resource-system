@@ -11,4 +11,5 @@ type Reservation struct {
 	ResourceID primitive.ObjectID `bson:"resource_id"`
 	StartTime  time.Time          `bson:"start_time"`
 	EndTime    time.Time          `bson:"end_time"`
+	CreatedAt  time.Time          `bson:"created_at"`
 }
