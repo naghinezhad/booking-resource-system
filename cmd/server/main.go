@@ -9,9 +9,13 @@ import (
 	"github.com/naghinezhad/BookingResourceSystem/internal/api"
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
+	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
 )
 
 func main() {
+	// init logger
+	logger.Init()
+
 	// load config
 	cfg := config.LoadConfig()
 

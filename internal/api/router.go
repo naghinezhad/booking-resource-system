@@ -7,6 +7,7 @@ import (
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
 	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
+	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 	"github.com/naghinezhad/BookingResourceSystem/internal/service"
 )
@@ -18,6 +19,9 @@ func SetupRouter(
 ) *gin.Engine {
 
 	r := gin.Default()
+
+	// load global logger
+	log := logger.Log
 
 	// repositories
 	reservationRepo := repository.NewReservationRepository(mongo.DB)
@@ -37,9 +41,9 @@ func SetupRouter(
 		redis,
 	)
 
-	// handlers
-	reservationHandler := handler.NewReservationHandler(reservationService)
-	availabilityHandler := handler.NewAvailabilityHandler(availabilityService)
+	// handlers (now with logger)
+	reservationHandler := handler.NewReservationHandler(reservationService, log)
+	availabilityHandler := handler.NewAvailabilityHandler(availabilityService, log)
 
 	// routes
 	r.POST("/reserve", reservationHandler.Reserve)

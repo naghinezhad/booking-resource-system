@@ -54,11 +54,7 @@ func (r *ReservationRepository) CheckAvailability(
 	return count == 0, nil
 }
 
-func (r *ReservationRepository) GetByResourceID(
-	ctx context.Context,
-	resourceID primitive.ObjectID,
-) ([]model.Reservation, error) {
-
+func (r ReservationRepository) GetByResourceID(ctx context.Context, resourceID primitive.ObjectID) ([]model.Reservation, error) {
 	filter := bson.M{
 		"resource_id": resourceID,
 	}
