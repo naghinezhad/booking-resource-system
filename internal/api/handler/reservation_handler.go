@@ -5,17 +5,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naghinezhad/BookingResourceSystem/internal/concurrency"
 	"github.com/naghinezhad/BookingResourceSystem/internal/service"
 	"go.uber.org/zap"
 )
 
 type ReservationHandler struct {
-	service *service.ReservationService
-	logger  *zap.Logger
+	service    *service.ReservationService
+	workerPool *concurrency.WorkerPool
+	logger     *zap.Logger
 }
 
-func NewReservationHandler(s *service.ReservationService, logger *zap.Logger) *ReservationHandler {
-	return &ReservationHandler{service: s, logger: logger}
+func NewReservationHandler(s *service.ReservationService, wp *concurrency.WorkerPool, logger *zap.Logger) *ReservationHandler {
+	return &ReservationHandler{
+		service:    s,
+		workerPool: wp,
+		logger:     logger,
+	}
 }
 
 type ReserveRequest struct {
@@ -25,15 +31,10 @@ type ReserveRequest struct {
 }
 
 func (h *ReservationHandler) Reserve(c *gin.Context) {
-
 	var req ReserveRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-
-		h.logger.Warn("invalid reserve request",
-			zap.Error(err),
-		)
-
+		h.logger.Warn("invalid reserve request", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -46,31 +47,41 @@ func (h *ReservationHandler) Reserve(c *gin.Context) {
 
 	start, err := time.Parse(time.RFC3339, req.StartTime)
 	if err != nil {
-
-		h.logger.Warn("invalid start_time format",
-			zap.String("start_time", req.StartTime),
-		)
-
+		h.logger.Warn("invalid start_time format", zap.String("start_time", req.StartTime))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_time"})
 		return
 	}
 
 	end, err := time.Parse(time.RFC3339, req.EndTime)
 	if err != nil {
-
-		h.logger.Warn("invalid end_time format",
-			zap.String("end_time", req.EndTime),
-		)
-
+		h.logger.Warn("invalid end_time format", zap.String("end_time", req.EndTime))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_time"})
 		return
 	}
 
-	err = h.service.Reserve(c, req.ResourceID, start, end)
+	job := concurrency.Job{
+		Ctx:        c.Request.Context(),
+		ResourceID: req.ResourceID,
+		Start:      start,
+		End:        end,
+		ResultChan: make(chan error, 1),
+	}
+
+	if !h.workerPool.Submit(job) {
+		h.logger.Warn("reservation queue full, dropping request",
+			zap.String("resource_id", req.ResourceID),
+		)
+
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": "server busy, queue is full",
+		})
+		return
+	}
+
+	err = <-job.ResultChan
 
 	if err != nil {
-
-		h.logger.Info("reservation conflict",
+		h.logger.Info("reservation failed",
 			zap.String("resource_id", req.ResourceID),
 			zap.Time("start_time", start),
 			zap.Time("end_time", end),

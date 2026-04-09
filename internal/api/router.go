@@ -4,7 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naghinezhad/BookingResourceSystem/config"
 	"github.com/naghinezhad/BookingResourceSystem/internal/api/handler"
+	"github.com/naghinezhad/BookingResourceSystem/internal/api/middleware"
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
+	"github.com/naghinezhad/BookingResourceSystem/internal/concurrency"
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
 	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
 	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
@@ -20,7 +22,7 @@ func SetupRouter(
 
 	r := gin.Default()
 
-	// load global logger
+	// logger
 	log := logger.Log
 
 	// repositories
@@ -41,9 +43,28 @@ func SetupRouter(
 		redis,
 	)
 
-	// handlers (now with logger)
-	reservationHandler := handler.NewReservationHandler(reservationService, log)
-	availabilityHandler := handler.NewAvailabilityHandler(availabilityService, log)
+	// Request Limiter
+	limiter := concurrency.NewRequestLimiter(cfg.MaxConcurrentRequests)
+	r.Use(middleware.RequestLimitMiddleware(limiter))
+
+	// Worker Pool
+	workerPool := concurrency.NewWorkerPool(
+		3,
+		cfg.MaxConcurrentRequests,
+		reservationService,
+	)
+
+	// handlers
+	reservationHandler := handler.NewReservationHandler(
+		reservationService,
+		workerPool,
+		log,
+	)
+
+	availabilityHandler := handler.NewAvailabilityHandler(
+		availabilityService,
+		log,
+	)
 
 	// routes
 	r.POST("/reserve", reservationHandler.Reserve)
