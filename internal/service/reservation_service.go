@@ -8,6 +8,7 @@ import (
 
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
+	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/model"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -40,6 +41,9 @@ func (s *ReservationService) Reserve(
 
 	objID, err := primitive.ObjectIDFromHex(resourceID)
 	if err != nil {
+
+		metrics.ReservationsTotal.WithLabelValues("invalid").Inc()
+
 		return errors.New("invalid resource id")
 	}
 
@@ -47,11 +51,19 @@ func (s *ReservationService) Reserve(
 	lockKey := fmt.Sprintf("lock:resource:%s", resourceID)
 	acquired, err := s.lock.Acquire(ctx, lockKey, 3*time.Second)
 	if err != nil {
+
+		metrics.ReservationsTotal.WithLabelValues("error").Inc()
+
 		return err
 	}
+
 	if !acquired {
+
+		metrics.ReservationsTotal.WithLabelValues("busy").Inc()
+
 		return errors.New("resource busy, try again")
 	}
+
 	defer func() {
 		if err := s.lock.Release(ctx, lockKey); err != nil {
 			fmt.Printf("failed to release lock: %v\n", err)
@@ -61,10 +73,16 @@ func (s *ReservationService) Reserve(
 	// check availability (db)
 	available, err := s.repo.CheckAvailability(ctx, objID, start, end)
 	if err != nil {
+
+		metrics.ReservationsTotal.WithLabelValues("error").Inc()
+
 		return err
 	}
 
 	if !available {
+
+		metrics.ReservationsTotal.WithLabelValues("conflict").Inc()
+
 		return errors.New("resource not available")
 	}
 
@@ -78,12 +96,17 @@ func (s *ReservationService) Reserve(
 
 	err = s.repo.Create(ctx, reservation)
 	if err != nil {
+
+		metrics.ReservationsTotal.WithLabelValues("error").Inc()
+
 		return err
 	}
 
 	// invalidate redis cache
 	cacheKey := fmt.Sprintf("availability:%s", resourceID)
 	s.cache.Client.Del(ctx, cacheKey)
+
+	metrics.ReservationsTotal.WithLabelValues("success").Inc()
 
 	return nil
 }

@@ -10,8 +10,10 @@ import (
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
 	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
 	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
+	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 	"github.com/naghinezhad/BookingResourceSystem/internal/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func SetupRouter(
@@ -19,8 +21,12 @@ func SetupRouter(
 	redis *cache.Redis,
 	cfg *config.Config,
 ) *gin.Engine {
+	metrics.Register()
 
 	r := gin.Default()
+
+	// metrics
+	r.Use(middleware.MetricsMiddleware())
 
 	// logger
 	log := logger.Log
@@ -70,6 +76,7 @@ func SetupRouter(
 	r.POST("/reserve", reservationHandler.Reserve)
 	r.GET("/availability", availabilityHandler.Check)
 	r.GET("/reservations", reservationHandler.GetReservations)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	return r
 }

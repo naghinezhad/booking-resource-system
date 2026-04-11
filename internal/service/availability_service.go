@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
+	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -44,8 +45,13 @@ func (s *AvailabilityService) CheckAvailability(
 	// Try Redis cache first
 	val, err := s.cache.Client.Get(ctx, cacheKey).Result()
 	if err == nil {
+
+		metrics.CacheHits.Inc()
+
 		return val == "1", nil
 	}
+
+	metrics.CacheMiss.Inc()
 
 	available, err := s.repo.CheckAvailability(ctx, objID, start, end)
 	if err != nil {
