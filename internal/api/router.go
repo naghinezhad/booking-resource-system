@@ -18,7 +18,7 @@ import (
 
 func SetupRouter(
 	mongo *database.Mongo,
-	redis *cache.Redis,
+	redis cache.Client,
 	cfg *config.Config,
 ) *gin.Engine {
 	metrics.Register()
@@ -35,7 +35,7 @@ func SetupRouter(
 	reservationRepo := repository.NewReservationRepository(mongo.DB)
 
 	// locking
-	distLock := lock.NewRedisLock(redis.Client)
+	distLock := lock.NewRedis(redis.Native())
 
 	// services
 	reservationService := service.NewReservationService(

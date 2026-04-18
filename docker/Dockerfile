@@ -1,11 +1,11 @@
 # ---------- Build Stage ----------
-FROM golang:1.26.1-alpine AS builder
+FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /app
 
 # use Go module mirror
-ENV GOPROXY=https://package-mirror.liara.ir/repository/go/
-ENV GOSUMDB=off
+# ENV GOPROXY=
+# ENV GOSUMDB=off
 
 # download dependencies
 COPY go.mod go.sum ./

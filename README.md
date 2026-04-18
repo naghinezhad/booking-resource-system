@@ -203,10 +203,10 @@ Example .env file:
 
 SERVER_PORT=8080
 
-MONGO_URI=mongodb://mongo:27017  
+MONGO_URI=mongodb://localhost:27017  
 MONGO_DB=booking
 
-REDIS_ADDR=redis:6379  
+REDIS_ADDR=localhost:6379  
 REDIS_PASS=
 
 MAX_CONCURRENT_REQUESTS=1000
@@ -215,17 +215,15 @@ MAX_CONCURRENT_REQUESTS=1000
 
 # Running the Project
 
-The easiest way to run the project is with Docker Compose.
+Run dependencies with Docker, and run the Go server locally.
 
-Start the system:
+1) Start MongoDB and Redis:
 
-docker compose up --build
+docker compose -f docker/docker-compose.yml up -d
 
-The following services will run:
+2) Run the Go API server locally:
 
-- Go API server
-- MongoDB
-- Redis
+go run ./cmd/server
 
 The API will be available at:
 
@@ -235,10 +233,7 @@ http://localhost:8080
 
 # Docker Services
 
-The system runs three containers:
-
-app  
-The Go application that handles API requests.
+The system runs two containers:
 
 mongo  
 MongoDB database storing reservations.
@@ -251,6 +246,16 @@ Redis instance used for caching and distributed locking.
 # Load Testing
 
 A load testing script can simulate thousands of concurrent requests to verify system behavior.
+
+Run the built-in Go load test command:
+
+go run ./cmd/loadtest
+
+Optional environment variables:
+
+- LOAD_TEST_TOTAL_REQUESTS (default: 1000)
+- LOAD_TEST_API_URL (default: http://localhost:8080/reserve)
+- LOAD_TEST_RESOURCE_ID (default: 665e3c4a0f7b8b3c8c6a1234)
 
 Example scenario:
 

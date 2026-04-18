@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/naghinezhad/BookingResourceSystem/internal/model"
@@ -22,22 +23,40 @@ func NewReservationRepository(db *mongo.Database) *ReservationRepository {
 
 func (r *ReservationRepository) Create(
 	ctx context.Context,
-	reservation *model.Reservation,
+	resourceID string,
+	start time.Time,
+	end time.Time,
 ) error {
+	objID, err := primitive.ObjectIDFromHex(resourceID)
+	if err != nil {
+		return errors.New("invalid resource id")
+	}
 
-	_, err := r.collection.InsertOne(ctx, reservation)
+	reservation := &model.Reservation{
+		ResourceID: objID,
+		StartTime:  start,
+		EndTime:    end,
+		CreatedAt:  time.Now(),
+	}
+
+	_, err = r.collection.InsertOne(ctx, reservation)
 	return err
 }
 
 func (r *ReservationRepository) CheckAvailability(
 	ctx context.Context,
-	resourceID primitive.ObjectID,
+	resourceID string,
 	start time.Time,
 	end time.Time,
 ) (bool, error) {
 
+	objID, err := primitive.ObjectIDFromHex(resourceID)
+	if err != nil {
+		return false, errors.New("invalid resource id")
+	}
+
 	filter := bson.M{
-		"resource_id": resourceID,
+		"resource_id": objID,
 		"start_time": bson.M{
 			"$lt": end,
 		},
@@ -54,9 +73,14 @@ func (r *ReservationRepository) CheckAvailability(
 	return count == 0, nil
 }
 
-func (r ReservationRepository) GetByResourceID(ctx context.Context, resourceID primitive.ObjectID) ([]model.Reservation, error) {
+func (r ReservationRepository) GetByResourceID(ctx context.Context, resourceID string) ([]model.Reservation, error) {
+	objID, err := primitive.ObjectIDFromHex(resourceID)
+	if err != nil {
+		return nil, errors.New("invalid resource id")
+	}
+
 	filter := bson.M{
-		"resource_id": resourceID,
+		"resource_id": objID,
 	}
 
 	cursor, err := r.collection.Find(ctx, filter)

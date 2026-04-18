@@ -2,29 +2,27 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type AvailabilityService struct {
 	repo  *repository.ReservationRepository
-	cache *cache.Redis
+	cache cache.Client
 }
 
 func NewAvailabilityService(
 	repo *repository.ReservationRepository,
-	cache *cache.Redis,
+	cacheClient cache.Client,
 ) *AvailabilityService {
 
 	return &AvailabilityService{
 		repo:  repo,
-		cache: cache,
+		cache: cacheClient,
 	}
 }
 
@@ -34,32 +32,29 @@ func (s *AvailabilityService) CheckAvailability(
 	start time.Time,
 	end time.Time,
 ) (bool, error) {
+	cacheKey := fmt.Sprintf(
+		"availability:%s:%d:%d",
+		id,
+		start.Unix(),
+		end.Unix(),
+	)
 
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return false, errors.New("invalid resource id")
-	}
-
-	cacheKey := fmt.Sprintf("availability:%s", id)
-
-	// Try Redis cache first
-	val, err := s.cache.Client.Get(ctx, cacheKey).Result()
+	val, err := s.cache.Get(ctx, cacheKey)
 	if err == nil {
 
 		metrics.CacheHits.Inc()
 
-		return val == "1", nil
+		return val == "true", nil
 	}
 
 	metrics.CacheMiss.Inc()
 
-	available, err := s.repo.CheckAvailability(ctx, objID, start, end)
+	available, err := s.repo.CheckAvailability(ctx, id, start, end)
 	if err != nil {
 		return false, err
 	}
 
-	// cache it
-	s.cache.Client.Set(ctx, cacheKey, map[bool]string{true: "1", false: "0"}[available], 5*time.Second)
+	_ = s.cache.Set(ctx, cacheKey, fmt.Sprintf("%t", available), 5*time.Second)
 
 	return available, nil
 }

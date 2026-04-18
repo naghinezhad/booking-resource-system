@@ -11,24 +11,23 @@ import (
 	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/model"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ReservationService struct {
 	repo  *repository.ReservationRepository
-	cache *cache.Redis
-	lock  *lock.RedisLock
+	cache cache.Client
+	lock  lock.Locker
 }
 
 func NewReservationService(
 	repo *repository.ReservationRepository,
-	cache *cache.Redis,
-	lock *lock.RedisLock,
+	cacheClient cache.Client,
+	locker lock.Locker,
 ) *ReservationService {
 	return &ReservationService{
 		repo:  repo,
-		cache: cache,
-		lock:  lock,
+		cache: cacheClient,
+		lock:  locker,
 	}
 }
 
@@ -38,18 +37,13 @@ func (s *ReservationService) Reserve(
 	start time.Time,
 	end time.Time,
 ) error {
-
-	objID, err := primitive.ObjectIDFromHex(resourceID)
-	if err != nil {
-
-		metrics.ReservationsTotal.WithLabelValues("invalid").Inc()
-
-		return errors.New("invalid resource id")
-	}
-
-	// distributed lock
-	lockKey := fmt.Sprintf("lock:resource:%s", resourceID)
-	acquired, err := s.lock.Acquire(ctx, lockKey, 3*time.Second)
+	lockKey := fmt.Sprintf(
+		"lock:resource:%s:%d:%d",
+		resourceID,
+		start.Unix(),
+		end.Unix(),
+	)
+	lockToken, err := s.lock.Acquire(ctx, lockKey, 30*time.Second)
 	if err != nil {
 
 		metrics.ReservationsTotal.WithLabelValues("error").Inc()
@@ -57,7 +51,7 @@ func (s *ReservationService) Reserve(
 		return err
 	}
 
-	if !acquired {
+	if lockToken == "" {
 
 		metrics.ReservationsTotal.WithLabelValues("busy").Inc()
 
@@ -65,13 +59,12 @@ func (s *ReservationService) Reserve(
 	}
 
 	defer func() {
-		if err := s.lock.Release(ctx, lockKey); err != nil {
+		if _, err := s.lock.Release(ctx, lockKey, lockToken); err != nil {
 			fmt.Printf("failed to release lock: %v\n", err)
 		}
 	}()
 
-	// check availability (db)
-	available, err := s.repo.CheckAvailability(ctx, objID, start, end)
+	available, err := s.repo.CheckAvailability(ctx, resourceID, start, end)
 	if err != nil {
 
 		metrics.ReservationsTotal.WithLabelValues("error").Inc()
@@ -86,15 +79,7 @@ func (s *ReservationService) Reserve(
 		return errors.New("resource not available")
 	}
 
-	// create reservation
-	reservation := &model.Reservation{
-		ResourceID: objID,
-		StartTime:  start,
-		EndTime:    end,
-		CreatedAt:  time.Now(),
-	}
-
-	err = s.repo.Create(ctx, reservation)
+	err = s.repo.Create(ctx, resourceID, start, end)
 	if err != nil {
 
 		metrics.ReservationsTotal.WithLabelValues("error").Inc()
@@ -102,9 +87,13 @@ func (s *ReservationService) Reserve(
 		return err
 	}
 
-	// invalidate redis cache
-	cacheKey := fmt.Sprintf("availability:%s", resourceID)
-	s.cache.Client.Del(ctx, cacheKey)
+	cacheKey := fmt.Sprintf(
+		"availability:%s:%d:%d",
+		resourceID,
+		start.Unix(),
+		end.Unix(),
+	)
+	_ = s.cache.Del(ctx, cacheKey)
 
 	metrics.ReservationsTotal.WithLabelValues("success").Inc()
 
@@ -115,11 +104,5 @@ func (s *ReservationService) GetReservations(
 	ctx context.Context,
 	resourceID string,
 ) ([]model.Reservation, error) {
-
-	objID, err := primitive.ObjectIDFromHex(resourceID)
-	if err != nil {
-		return nil, errors.New("invalid resource id")
-	}
-
-	return s.repo.GetByResourceID(ctx, objID)
+	return s.repo.GetByResourceID(ctx, resourceID)
 }

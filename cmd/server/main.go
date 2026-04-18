@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	runMigration := flag.Bool("migration", false, "run database migrations and exit")
+	flag.Parse()
+
 	// init logger
 	logger.Init()
 
@@ -36,21 +40,22 @@ func main() {
 
 	log.Println("Mongo connected:", mongo.DB.Name())
 
-	// run migrations
-	err = database.RunMigrations(cfg.MongoURI, cfg.MongoDB)
-	if err != nil {
-		log.Fatal("migration error:", err)
+	if *runMigration {
+		err = database.RunMigrations(cfg.MongoURI, cfg.MongoDB)
+		if err != nil {
+			log.Fatal("migration error:", err)
+		}
+
+		log.Println("Migrations applied")
+		return
 	}
 
-	log.Println("Migrations applied")
-
 	// redis connection
-	redisClient := cache.NewRedis(
+	redisClient, err := cache.NewRedis(
+		ctx,
 		cfg.RedisAddr,
 		cfg.RedisPass,
 	)
-
-	err = redisClient.Ping(ctx)
 	if err != nil {
 		log.Fatal("redis connection error:", err)
 	}

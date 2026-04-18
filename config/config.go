@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -15,20 +16,44 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
+	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = "8080"
+	}
+
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017"
+	}
+	if !strings.HasPrefix(mongoURI, "mongodb://") && !strings.HasPrefix(mongoURI, "mongodb+srv://") {
+		mongoURI = "mongodb://" + mongoURI
+	}
+
+	mongoDB := os.Getenv("MONGO_DB")
+	if mongoDB == "" {
+		mongoDB = "booking"
+	}
+
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+
+	redisPass := os.Getenv("REDIS_PASS")
 
 	maxReqStr := os.Getenv("MAX_CONCURRENT_REQUESTS")
 
 	maxReq, err := strconv.Atoi(maxReqStr)
 	if err != nil {
-		maxReq = 1000
+		maxReq = 100
 	}
 
 	return &Config{
-		ServerPort:            os.Getenv("SERVER_PORT"),
-		MongoURI:              os.Getenv("MONGO_URI"),
-		MongoDB:               os.Getenv("MONGO_DB"),
-		RedisAddr:             os.Getenv("REDIS_ADDR"),
-		RedisPass:             os.Getenv("REDIS_PASS"),
+		ServerPort:            serverPort,
+		MongoURI:              mongoURI,
+		MongoDB:               mongoDB,
+		RedisAddr:             redisAddr,
+		RedisPass:             redisPass,
 		MaxConcurrentRequests: maxReq,
 	}
 }
