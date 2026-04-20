@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/naghinezhad/BookingResourceSystem/internal/concurrency"
 	"github.com/naghinezhad/BookingResourceSystem/internal/service"
+	"github.com/naghinezhad/BookingResourceSystem/internal/utils/concurrency"
 	"go.uber.org/zap"
 )
 

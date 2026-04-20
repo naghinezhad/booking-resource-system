@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/naghinezhad/BookingResourceSystem/internal/concurrency"
+	"github.com/naghinezhad/BookingResourceSystem/internal/utils/concurrency"
 )
 
 func RequestLimitMiddleware(l *concurrency.RequestLimiter) gin.HandlerFunc {

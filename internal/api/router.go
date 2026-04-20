@@ -5,20 +5,19 @@ import (
 	"github.com/naghinezhad/BookingResourceSystem/config"
 	"github.com/naghinezhad/BookingResourceSystem/internal/api/handler"
 	"github.com/naghinezhad/BookingResourceSystem/internal/api/middleware"
-	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
-	"github.com/naghinezhad/BookingResourceSystem/internal/concurrency"
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
-	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
-	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
 	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
+	"github.com/naghinezhad/BookingResourceSystem/internal/redis"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 	"github.com/naghinezhad/BookingResourceSystem/internal/service"
+	"github.com/naghinezhad/BookingResourceSystem/internal/utils/concurrency"
+	"github.com/naghinezhad/BookingResourceSystem/internal/utils/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func SetupRouter(
 	mongo *database.Mongo,
-	redis cache.Client,
+	redisClient redis.Client,
 	cfg *config.Config,
 ) *gin.Engine {
 	metrics.Register()
@@ -34,19 +33,15 @@ func SetupRouter(
 	// repositories
 	reservationRepo := repository.NewReservationRepository(mongo.DB)
 
-	// locking
-	distLock := lock.NewRedis(redis.Native())
-
 	// services
 	reservationService := service.NewReservationService(
 		reservationRepo,
-		redis,
-		distLock,
+		redisClient,
 	)
 
 	availabilityService := service.NewAvailabilityService(
 		reservationRepo,
-		redis,
+		redisClient,
 	)
 
 	// Request Limiter

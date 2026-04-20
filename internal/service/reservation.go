@@ -6,28 +6,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
-	"github.com/naghinezhad/BookingResourceSystem/internal/lock"
 	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
 	"github.com/naghinezhad/BookingResourceSystem/internal/model"
+	"github.com/naghinezhad/BookingResourceSystem/internal/redis"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 )
 
 type ReservationService struct {
 	repo  *repository.ReservationRepository
-	cache cache.Client
-	lock  lock.Locker
+	redis redis.Client
 }
 
 func NewReservationService(
 	repo *repository.ReservationRepository,
-	cacheClient cache.Client,
-	locker lock.Locker,
+	redisClient redis.Client,
 ) *ReservationService {
 	return &ReservationService{
 		repo:  repo,
-		cache: cacheClient,
-		lock:  locker,
+		redis: redisClient,
 	}
 }
 
@@ -43,7 +39,7 @@ func (s *ReservationService) Reserve(
 		start.Unix(),
 		end.Unix(),
 	)
-	lockToken, err := s.lock.Acquire(ctx, lockKey, 30*time.Second)
+	lockToken, err := s.redis.AcquireLock(ctx, lockKey, 30*time.Second)
 	if err != nil {
 
 		metrics.ReservationsTotal.WithLabelValues("error").Inc()
@@ -59,7 +55,7 @@ func (s *ReservationService) Reserve(
 	}
 
 	defer func() {
-		if _, err := s.lock.Release(ctx, lockKey, lockToken); err != nil {
+		if _, err := s.redis.ReleaseLock(ctx, lockKey, lockToken); err != nil {
 			fmt.Printf("failed to release lock: %v\n", err)
 		}
 	}()
@@ -93,7 +89,7 @@ func (s *ReservationService) Reserve(
 		start.Unix(),
 		end.Unix(),
 	)
-	_ = s.cache.Del(ctx, cacheKey)
+	_ = s.redis.Del(ctx, cacheKey)
 
 	metrics.ReservationsTotal.WithLabelValues("success").Inc()
 

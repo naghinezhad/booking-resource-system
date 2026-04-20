@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/metrics"
+	"github.com/naghinezhad/BookingResourceSystem/internal/redis"
 	"github.com/naghinezhad/BookingResourceSystem/internal/repository"
 )
 
 type AvailabilityService struct {
 	repo  *repository.ReservationRepository
-	cache cache.Client
+	redis redis.Client
 }
 
 func NewAvailabilityService(
 	repo *repository.ReservationRepository,
-	cacheClient cache.Client,
+	redisClient redis.Client,
 ) *AvailabilityService {
 
 	return &AvailabilityService{
 		repo:  repo,
-		cache: cacheClient,
+		redis: redisClient,
 	}
 }
 
@@ -39,7 +39,7 @@ func (s *AvailabilityService) CheckAvailability(
 		end.Unix(),
 	)
 
-	val, err := s.cache.Get(ctx, cacheKey)
+	val, err := s.redis.Get(ctx, cacheKey)
 	if err == nil {
 
 		metrics.CacheHits.Inc()
@@ -54,7 +54,7 @@ func (s *AvailabilityService) CheckAvailability(
 		return false, err
 	}
 
-	_ = s.cache.Set(ctx, cacheKey, fmt.Sprintf("%t", available), 5*time.Second)
+	_ = s.redis.Set(ctx, cacheKey, fmt.Sprintf("%t", available), 5*time.Second)
 
 	return available, nil
 }

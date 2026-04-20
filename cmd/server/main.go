@@ -8,9 +8,9 @@ import (
 
 	"github.com/naghinezhad/BookingResourceSystem/config"
 	"github.com/naghinezhad/BookingResourceSystem/internal/api"
-	"github.com/naghinezhad/BookingResourceSystem/internal/cache"
 	"github.com/naghinezhad/BookingResourceSystem/internal/database"
-	"github.com/naghinezhad/BookingResourceSystem/internal/logger"
+	"github.com/naghinezhad/BookingResourceSystem/internal/redis"
+	"github.com/naghinezhad/BookingResourceSystem/internal/utils/logger"
 )
 
 func main() {
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// redis connection
-	redisClient, err := cache.NewRedis(
+	redisClient, err := redis.NewRedis(
 		ctx,
 		cfg.RedisAddr,
 		cfg.RedisPass,
